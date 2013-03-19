@@ -1,0 +1,83 @@
+<?php
+
+module_load_include('inc', 'path_usage', 'path_usage.polyfills');
+
+function path_usage_view_paths($view, $display_id) {
+  module_load_include('inc', 'path_usage');
+  return path_usage_find_paths($view, $view->name, 'view', $display_id);
+}
+
+function path_usage_menu() {
+  return array(
+    'admin/config/content/path_usage' => array(
+      'title' => 'Test Path Usage',
+      'description' => 'This tests the paths',
+      'access callback' => TRUE,
+      'page callback' => '_path_usage_test_page',
+    )
+  );
+}
+
+function _path_usage_test_page() {
+  $paths = path_usage_entity_paths('node', node_load(1));
+  return implode('<br />', $paths);
+}
+
+function path_usage_entity_paths($entity_type, $entity) {
+  $info = entity_get_info($entity_type);
+  $bundle_key = isset($info['entity keys']['bundle']) ? $info['entity keys']['bundle'] : NULL;
+  $id_key = $info['entity keys']['id'];
+  $bundle = NULL;
+  if (!empty($bundle_key)) {
+    $bundle = $entity->{$bundle_key};
+  }
+  module_load_include('inc', 'path_usage');
+  return path_usage_find_paths($entity, $entity->{$id_key}, $entity_type, $bundle);
+}
+
+function _path_usage_find_fields_of_type($field_type, $entity_type = NULL, $bundle = NULL) {
+  $map = field_info_fields();
+  $fields = array();
+  foreach ($map as $field_name => $field) {
+    if ($field['type'] == $field_type) {
+      if (!empty($entity_type)) {
+        if (empty($field['entity_types']) || in_array($entity_type, $field['entity_types'])) {
+          if (!empty($bundle)) {
+            if (isset($field['bundles'][$entity_type])) {
+              if (in_array($bundle, $field['bundles'][$entity_type])) {
+                $fields[$field_name] = $field;
+              }
+            }
+          } else {
+            $fields[$field_name] = $field;
+          }
+        }
+      } else {
+        $fields[$field_name] = $field;
+      }
+    }
+  }
+  return $fields;
+}
+
+function _path_usage_find_all_entities($field_info, $target_data) {
+  $types = array();
+  if (!empty($field_info['entity_types'])) {
+    $types = $field_info['entity_types'];
+  } else {
+    $types = array_keys(entity_get_info());
+  }
+  $results = array();
+  foreach ($types as $type) {
+    $results[$type] = array();
+    $efq = new EntityFieldQuery();
+    $efq->entityCondition('entity_type', $type);
+    foreach ($target_data as $op_info) {
+      $operator = isset($op_info['operator']) ? $op_info['operation'] : NULL;
+      $efq->fieldCondition($field_info['field_name'], $op_info['column'], $op_info['value'], $operator);
+    }
+    $rs = $efq->execute();
+    $results[$type] += entity_load($type, array_keys($rs[$type]));
+  }
+  return $results;
+}

@@ -1,0 +1,4 @@
+name = Path Usage
+description = "Provides an API for seeing what paths a certain piece of
+content is used on"
+core = 7.x
